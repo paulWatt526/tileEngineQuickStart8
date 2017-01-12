@@ -606,7 +606,6 @@ function scene:create( event )
     toggleWallsButton = display.newImageRect("toggleWalls.png", 237, 64)
     toggleWallsButton.x = display.screenOriginX + 237 / 2 + 5
     toggleWallsButton.y = display.screenOriginY + 64 / 2 + 5
-    toggleWallsButton:addEventListener("tap", toggleWalls)
 end
 
 
@@ -633,6 +632,9 @@ function scene:show( event )
 
         -- Register an event listener to handle screen taps.
         Runtime:addEventListener( "tap", tapListener )
+
+        -- Register listener for the toggle wall buttons
+        toggleWallsButton:addEventListener("tap", toggleWalls)
     elseif ( phase == "did" ) then
         -- Code here runs when the scene is entirely on screen
     end
@@ -652,6 +654,9 @@ function scene:hide( event )
 
         -- Remove the event listener for taps
         Runtime:removeEventListener( "tap", tapListener)
+
+        -- Register listener for the toggle wall button
+        toggleWallsButton:removeEventListener("tap", toggleWalls)
     elseif ( phase == "did" ) then
         -- Code here runs immediately after the scene goes entirely off screen
     end
@@ -675,7 +680,6 @@ function scene:destroy( event )
     -- Set the reference to the lighting model to nil.
     lightingModel = nil
 
-    toggleWallsButton:removeEventListener("tap", toggleWalls)
     toggleWallsButton:removeSelf()
     toggleWallsButton = nil
 end
