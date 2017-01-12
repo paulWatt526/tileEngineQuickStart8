@@ -49,6 +49,7 @@ local entityId                              -- Will track the ID of the entity
 local entityDirection                       -- Tracks the direction of the moving entity
 local entityLayer                           -- Reference to the entity layer
 local playerTokenId                         -- Will track the ID of the player token.
+local toggleWallsButton                     -- Reference to the toggle botton
 
 -- -----------------------------------------------------------------------------------
 -- This will load in the example sprite sheet.  Replace this with the sprite
@@ -72,6 +73,127 @@ spriteResolver.resolveForKey = function(key)
         width = frame.width,
         height = frame.height
     })
+end
+
+local function clearWall(row, column)
+    ENVIRONMENT[row][column] = 0
+    local module = tileEngine.getActiveModule()
+    module.layers[1].layer.updateTile(row, column, TileEngine.Tile.new({
+        resourceKey="tiles_0"
+    }))
+    for i=3,#module.layers do
+        module.layers[i].layer.updateTile(row, column, nil)
+    end
+    module.lightingModel.markChangeInTransparency(row, column)
+    module.losModel.makeDirty()
+end
+
+local function addWall(row, column)
+    ENVIRONMENT[row][column] = 1
+    local module = tileEngine.getActiveModule()
+    module.layers[1].layer.updateTile(row, column, TileEngine.Tile.new({
+        resourceKey="tiles_1"
+    }))
+    for i=3,#module.layers do
+        module.layers[i].layer.updateTile(row, column, TileEngine.Tile.new({
+            resourceKey="tiles_1"
+        }))
+    end
+    module.lightingModel.markChangeInTransparency(row, column)
+    module.losModel.makeDirty()
+end
+
+local pillarStateMachine = {}
+pillarStateMachine.init = function()
+    pillarStateMachine.curState = 1
+end
+pillarStateMachine.nextState = function()
+    pillarStateMachine.curState = pillarStateMachine.curState + 1
+    if pillarStateMachine.curState > 6 then
+        pillarStateMachine.curState = 1
+    end
+
+    if pillarStateMachine.curState == 1 then
+        addWall(5,5)
+        addWall(6,5)
+        addWall(5,6)
+        addWall(6,6)
+
+        addWall(5,10)
+        addWall(6,10)
+        addWall(5,11)
+        addWall(6,11)
+
+        addWall(10,5)
+        addWall(11,5)
+        addWall(10,6)
+        addWall(11,6)
+    end
+
+    if pillarStateMachine.curState == 2 then
+        clearWall(5,5)
+        clearWall(6,5)
+        clearWall(5,6)
+        clearWall(6,6)
+
+        clearWall(5,10)
+        clearWall(6,10)
+        clearWall(5,11)
+        clearWall(6,11)
+
+        clearWall(10,5)
+        clearWall(11,5)
+        clearWall(10,6)
+        clearWall(11,6)
+
+        clearWall(10,10)
+        clearWall(11,10)
+        clearWall(10,11)
+        clearWall(11,11)
+    end
+
+    if pillarStateMachine.curState == 3 then
+        addWall(5,5)
+        addWall(6,5)
+        addWall(5,6)
+        addWall(6,6)
+    end
+
+    if pillarStateMachine.curState == 4 then
+        clearWall(5,5)
+        clearWall(6,5)
+        clearWall(5,6)
+        clearWall(6,6)
+
+        addWall(5,10)
+        addWall(6,10)
+        addWall(5,11)
+        addWall(6,11)
+    end
+
+    if pillarStateMachine.curState == 5 then
+        clearWall(5,10)
+        clearWall(6,10)
+        clearWall(5,11)
+        clearWall(6,11)
+
+        addWall(10,5)
+        addWall(11,5)
+        addWall(10,6)
+        addWall(11,6)
+    end
+
+    if pillarStateMachine.curState == 6 then
+        clearWall(10,5)
+        clearWall(11,5)
+        clearWall(10,6)
+        clearWall(11,6)
+
+        addWall(10,10)
+        addWall(11,10)
+        addWall(10,11)
+        addWall(11,11)
+    end
 end
 
 local stateMachine = {}
@@ -169,6 +291,14 @@ stateMachine.nextState = function()
         leftLightId = nil
         lightingModel.setAmbientLight(1,1,1,0.75)
     end
+end
+
+-- -----------------------------------------------------------------------------------
+-- An event handler for toggling walls.
+-- -----------------------------------------------------------------------------------
+local function toggleWalls()
+    pillarStateMachine.nextState()
+    return true
 end
 
 -- -----------------------------------------------------------------------------------
@@ -315,14 +445,14 @@ local function onFrame(event)
         -- Update the state machine
         stateMachine.update(deltaTime)
 
-        -- Update the lighting model passing the amount of time that has passed since
-        -- the last frame.
-        lightingModel.update(deltaTime)
-
         -- Update the line of sight model passing the row and column for the current
         -- point of view nad the amount of time that has passed
         -- since the last frame.
         lineOfSightModel.update(8, math.floor(curXPos + 0.5), deltaTime)
+
+        -- Update the lighting model passing the amount of time that has passed since
+        -- the last frame.
+        lightingModel.update(deltaTime)
     else
         -- This is the first call to onFrame, so lastTime needs to be initialized.
         lastTime = event.time
@@ -336,14 +466,14 @@ local function onFrame(event)
         -- Set the initial position of the player token
         entityLayer.centerEntityOnTile(playerTokenId, 8, 2)
 
-        -- Since a time delta cannot be calculated on the first frame, 1 is passed
-        -- in here as a placeholder.
-        lightingModel.update(1)
-
         -- Set the initial position of the player to match the
         -- position of the camera.  Pass in a time delta of 1 since this is
         -- the first frame.
         lineOfSightModel.update(8, 3, 1)
+
+        -- Since a time delta cannot be calculated on the first frame, 1 is passed
+        -- in here as a placeholder.
+        lightingModel.update(1)
     end
 
     -- Render the tiles visible to the passed in camera.
@@ -398,7 +528,7 @@ function scene:create( event )
         radius = 20,
         isTransparent = isTileTransparent
     })
-    lineOfSightModel.setTransitionTime(225)
+    lineOfSightModel.setTransitionTime(0)
 
     -- Instantiate the module.
     local module = TileEngine.Module.new({
@@ -470,6 +600,13 @@ function scene:create( event )
     })
 
     stateMachine.init()
+    pillarStateMachine.init()
+
+    -- Button to toggle walls
+    toggleWallsButton = display.newImageRect("toggleWalls.png", 237, 64)
+    toggleWallsButton.x = display.screenOriginX + 237 / 2 + 5
+    toggleWallsButton.y = display.screenOriginY + 64 / 2 + 5
+    toggleWallsButton:addEventListener("tap", toggleWalls)
 end
 
 
@@ -537,6 +674,10 @@ function scene:destroy( event )
 
     -- Set the reference to the lighting model to nil.
     lightingModel = nil
+
+    toggleWallsButton:removeEventListener("tap", toggleWalls)
+    toggleWallsButton:removeSelf()
+    toggleWallsButton = nil
 end
 
 
